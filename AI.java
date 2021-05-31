@@ -1,5 +1,6 @@
 package gobang;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -13,11 +14,14 @@ public class AI {
 	private GobangModel gobangModel1;// 棋盘模型类
 	private GobangPanel gobangPanel1;// 棋盘面板类
 	private final int boundary = 8;// 棋盘边界值常量，用于捕捉棋型时填充边界
+	private byte[][] chessmanArray;
+	private ArrayList<chess_ai> eplist;
 
 	public AI(MainFrame outer) {
 		frame = outer;// 外部窗体对象
 		gobangModel1 = GobangModel.getInstance();// 获取棋子模型
 		gobangPanel1 = frame.getChessPanel1().getGobangPanel1();// 获得当前使用的棋盘面板
+		chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
 	}
 
 	/**
@@ -38,10 +42,369 @@ public class AI {
 	}
 
 	/**
+	 * 判断一个位置周围有没有子，这是用来决定哪些地方适合下的
+	 *
+	 * @return boolean
+	 *
+	 */
+	public boolean hasnext(int x,int y){
+		chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+		int a,b;
+		if(x-3>=0){
+			a=x-3;
+		}
+		else{
+			a=0;
+		}
+		if(y-3>=0){
+			b=y-3;
+		}
+		else{
+			b=0;
+		}
+		for(int  i=a;i<x+3&&i<15;i++){
+			for(int j=b;j<y+3&&j<15;j++){
+				if(chessmanArray[i][j]==1||chessmanArray[i][j]==-1){
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 生成基于hasnext()方法的空子序列，也就是可以选择的点
+	 *
+	 * @return ArrayList<chess_ai>
+	 *
+	 */
+
+	public ArrayList<chess_ai> creatempty_list()//产生空子序列
+	{
+		ArrayList<chess_ai> emptylist=new ArrayList<chess_ai>();
+		chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+		int i,j;
+		for( i=0;i<15;i++){
+			for(j=0;j<15;j++){
+				if(chessmanArray[i][j]!=GobangModel.WHITE_CHESSMAN&&chessmanArray[i][j]!=GobangModel.BLACK_CHESSMAN&&hasnext(i,j))
+				{
+					chess_ai Chess_ai= new chess_ai(i,j);
+					emptylist.add(Chess_ai);
+				}
+			}
+		}
+		System.out.println("集合的长度：" + emptylist.size());
+		return emptylist;
+	}
+
+
+	/**
+	 * 一个简单的权值估测方法，为不同类型的棋形记不同分数
+	 *
+	 * @input
+	 * number:连接的棋子数量 type：“死活"
+	 * @return int 棋形分数
+	 *
+	 */
+
+	public int getscore(int number,int type)//计分权值表
+	{
+		if(number>=5)	return 100000;
+		else if(number==4)
+		{
+			if(type==2)	return 10000;
+			else if(type==1)	return 1000;
+		}
+		else if(number==3)
+		{
+			if(type==2)	return 1000;
+			else if(type==1)	return 100;
+		}
+		else if(number==2)
+		{
+			if(type==2)	return 100;
+			else if(type==1)	return 10;
+		}
+		else if(number==1&&type==2)	return 10;
+		return 0;
+	}
+
+	/**
+	 * 把输入的一维数组格式的行列等拆解，然后调用计分权值表给出这一个一维数组的估值
+	 *
+	 * @input
+	 * n:包含某一个一位数组上棋子的样子 color：预期棋子颜色
+	 * @return int 该一维数组的分数
+	 *
+	 */
+	public int countscore(ArrayList<Integer> n,int color)
+	{
+		chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+		int scoretmp=0;
+		int len=n.size();
+		int empty1=0;
+		int number=0;
+		if(n.get(0)==0)	++empty1;
+		else if(n.get(0)==color)	++number;
+		int i=1;
+		while(i<len)
+		{
+			if(n.get(i)==color)	++number;
+			else if(n.get(i)==0)
+			{
+				if(number==0)	empty1=1;
+				else
+				{
+					scoretmp+=getscore(number,empty1+1);
+					empty1=1;
+					number=0;
+				}
+			}
+			else
+			{
+				scoretmp+=getscore(number,empty1);
+				empty1=0;
+				number=0;
+			}
+			++i;
+		}
+		scoretmp+=getscore(number,empty1);
+		return scoretmp;
+	}
+
+	/**
+	 * 评估函数，预测局势，本质是多个方向拆解出一维数组再调用countscore（）
+	 *
+	 * @input 无
+	 *
+	 * @return int 最终全局估值
+	 *
+	 */
+
+	public int evaluate() {
+		chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+		int scorecomputer = 0;
+		int scorehumman = 0;
+		//-
+		for (int i = 0; i < 15; i++) {
+			ArrayList<Integer> nt = new ArrayList<Integer>();
+			for (int j = 0; j < 15; j++) {
+				if(chessmanArray[i][j]==GobangModel.WHITE_CHESSMAN){
+					nt.add(2);
+				}
+				else if(chessmanArray[i][j]==GobangModel.BLACK_CHESSMAN){
+					nt.add(1);
+				}
+				else{
+					nt.add(0);
+				}
+			}
+			scorecomputer += countscore(nt, 2);
+			scorehumman+= countscore(nt, 1);
+			nt.clear();
+		}
+		//|
+		for (int j = 0; j < 15; j++) {
+			ArrayList<Integer> nt = new ArrayList<Integer>();
+			for (int i = 0; i < 15; i++) {
+				if(chessmanArray[i][j]==GobangModel.WHITE_CHESSMAN){
+					nt.add(2);
+				}
+				else if(chessmanArray[i][j]==GobangModel.BLACK_CHESSMAN){
+					nt.add(1);
+				}
+				else{
+					nt.add(0);
+				}
+			}
+			scorecomputer += countscore(nt, 2);
+			scorehumman+= countscore(nt, 1);
+			nt.clear();
+		}
+		//上半正斜线
+		for (int i = 0; i < 15; i++) {
+			ArrayList<Integer> nt = new ArrayList<Integer>();
+			int x, y;
+			for (x = i, y = 0; x < 15 && y < 15; x++, y++){
+				if(chessmanArray[y][x]==GobangModel.WHITE_CHESSMAN){
+					nt.add(2);
+				}
+				else if(chessmanArray[y][x]==GobangModel.BLACK_CHESSMAN){
+					nt.add(1);
+				}
+				else{
+					nt.add(0);
+				}
+			}
+			scorecomputer += countscore(nt, 2);
+			scorehumman+= countscore(nt, 1);
+			nt.clear();
+		}
+		//下半正斜线
+		for (int j = 0; j < 15; j++) {
+			int x, y;
+			ArrayList<Integer> nt = new ArrayList<Integer>();
+			for (x = 0, y = j; y < 15 && x < 15; x++, y++){
+				if(chessmanArray[y][x]==GobangModel.WHITE_CHESSMAN){
+					nt.add(2);
+				}
+				else if(chessmanArray[y][x]==GobangModel.BLACK_CHESSMAN){
+					nt.add(1);
+				}
+				else{
+					nt.add(0);
+				}
+			}
+			scorecomputer += countscore(nt, 2);
+			scorehumman+= countscore(nt, 1);
+			nt.clear();
+		}
+		//上半反斜线
+		for (int i = 0; i < 15; i++) {
+			ArrayList<Integer> nt = new ArrayList<Integer>();
+			int x, y;
+			for (y = i, x = 0; y >= 0 && x < 15; y--, x++){
+				if(chessmanArray[y][x]==GobangModel.WHITE_CHESSMAN){
+					nt.add(2);
+				}
+				else if(chessmanArray[y][x]==GobangModel.BLACK_CHESSMAN){
+					nt.add(1);
+				}
+				else{
+					nt.add(0);
+				}
+			}
+			scorecomputer += countscore(nt, 2);
+			scorehumman+= countscore(nt, 1);
+			nt.clear();
+		}
+		//下半反斜线
+		for (int j = 0; j < 15; j++) {
+			ArrayList<Integer> nt = new ArrayList<Integer>();
+			int x, y;
+			for (y = j, x = 14; y < 15 && x >= 0; y++, x--){
+				if(chessmanArray[x][y]==GobangModel.WHITE_CHESSMAN){
+					nt.add(2);
+				}
+				else if(chessmanArray[x][y]==GobangModel.BLACK_CHESSMAN){
+					nt.add(1);
+				}
+				else{
+					nt.add(0);
+				}
+			}
+			scorecomputer += countscore(nt, 2);
+			scorehumman+= countscore(nt, 1);
+			nt.clear();
+		}
+		return scorehumman-scorecomputer;
+	}
+
+	/**
+	 * 递归计算人权值树
+	 *
+	 * @input 深度
+	 *
+	 * @return int 最终全局估值
+	 *
+	 */
+
+	public int min_noalphabeta(int depth)//玩家落子时													//当min（人）走步时，人的最好情况
+	{
+		chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+		int res=evaluate();
+		if(depth<=0)
+		{
+			return res;
+		}
+		ArrayList<chess_ai>  v;
+		v=creatempty_list();
+		int len=v.size();
+		int best=212121121;
+		for(int i=0;i<len;++i)
+		{
+			chessmanArray[v.get(i).getX()][v.get(i).getY()] = GobangModel.WHITE_CHESSMAN;// 在此处下一枚白棋
+			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
+			int tmp=max_noalphabeta(depth-1);
+			if(tmp<best)	best=tmp;//玩家落子时选择最有利自己的局面，将推迟，叶子节点做出选择后，层层往上推
+			chessmanArray[v.get(i).getX()][v.get(i).getY()] = 0;
+			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
+		}
+		return best;
+	}
+
+	/**
+	 * 递归计算AI权值树
+	 *
+	 * @input 深度
+	 *
+	 * @return int 最终全局估值
+	 *
+	 */
+
+	int max_noalphabeta(int depth)													//当max（电脑）走步时，max（电脑）应该考虑最好的情况
+	{
+		chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+		int res=evaluate();
+		if(depth<=0)
+		{
+			return res;
+		}
+		ArrayList<chess_ai>  v;
+		v=creatempty_list();
+		int len=v.size();
+		int best=-22222222;
+		for(int i=0;i<len;++i)
+		{
+			chessmanArray[v.get(i).getX()][v.get(i).getY()] = GobangModel.BLACK_CHESSMAN;// 在此处下一枚黑棋
+			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
+			int tmp=min_noalphabeta(depth-1);
+			if(tmp>best)	best=tmp;//电脑落子时，选择最有利于自己的局面，将推迟
+			chessmanArray[v.get(i).getX()][v.get(i).getY()] = 0;
+			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
+		}
+		return best;
+	}
+
+
+	/**
+	 * 最终的最佳落点
+	*/
+	public int[] predict_perfect_spot(int depth)//极大极小值算法搜索n步后的最优解
+	{
+		chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+		ArrayList<chess_ai>  v;
+		v=creatempty_list();
+		int best=-22222222;
+		int len=v.size();
+		int best_pair=0;
+		for(int i=0;i<len;++i)
+		{
+			chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+			chessmanArray[v.get(i).getX()][v.get(i).getY()] = GobangModel.BLACK_CHESSMAN;// 在此处下一枚黑棋
+			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
+			int tmp=min_noalphabeta(depth-1);
+			if(tmp>best)
+			{
+				best=tmp;
+				best_pair=i;
+			}
+			chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+			chessmanArray[v.get(i).getX()][v.get(i).getY()] = 0;// 在此处下一枚黑棋
+			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
+		}
+		return new int[] {v.get(best_pair).getX(),v.get(best_pair).getY()};
+	}
+
+	/**
 	 * 电脑落棋
 	 */
 	public void chess() {
-		int chessIndex[] = forEach();// 获取AI判断的下棋位置
+		//int chessIndex[] = forEach();// 获取AI判断的下棋位置
+		int chessIndex[]=predict_perfect_spot(3);
+		int key=evaluate();
+		System.out.println(key);
+		eplist=creatempty_list();
 		gobangPanel1.chessForMachine(chessIndex[0], chessIndex[1]);// 将棋子放入棋盘指定位置
 	}
 
@@ -53,7 +416,7 @@ public class AI {
 	private int[] forEach() {
 		int x = -1, y = -1;// 将要下的棋子坐标
 		int threat = 0;// 棋盘上出现的最大威胁值
-		byte[][] chessmanArray = gobangModel1.getChessmanArray();// 获得棋盘
+		chessmanArray = gobangModel1.getChessmanArray();
 		for (int i = 0; i < 15; i++) {// 遍历棋盘行
 			for (int j = 0; j < 15; j++) {// 遍历棋盘列
 				if (chessmanArray[i][j] > 0) {// 如果此处有白棋子

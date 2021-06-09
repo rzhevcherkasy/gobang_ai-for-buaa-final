@@ -14,6 +14,8 @@ public class AI {
 	private GobangModel gobangModel1;// 棋盘模型类
 	private GobangPanel gobangPanel1;// 棋盘面板类
 	private final int boundary = 8;// 棋盘边界值常量，用于捕捉棋型时填充边界
+	private int alpha=0; //剪枝用的
+	private int beta=0; //剪枝用的
 	private byte[][] chessmanArray;
 	private ArrayList<chess_ai> eplist;
 
@@ -327,8 +329,12 @@ public class AI {
 			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
 			int tmp=max_noalphabeta(depth-1);
 			if(tmp<best)	best=tmp;//玩家落子时选择最有利自己的局面，将推迟，叶子节点做出选择后，层层往上推
+			alpha = Math.max(beta, tmp);
 			chessmanArray[v.get(i).getX()][v.get(i).getY()] = 0;
 			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
+			if(alpha<=tmp){
+				break;              //剪枝
+			}
 		}
 		return best;
 	}
@@ -360,8 +366,12 @@ public class AI {
 			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
 			int tmp=min_noalphabeta(depth-1);
 			if(tmp>best)	best=tmp;//电脑落子时，选择最有利于自己的局面，将推迟
+			alpha = Math.max(best, alpha);
 			chessmanArray[v.get(i).getX()][v.get(i).getY()] = 0;
 			gobangModel1.setChessmanArray(chessmanArray);// 更新棋盘数据
+			if(beta>=tmp){
+				break;              //剪枝
+			}
 		}
 		return best;
 	}
